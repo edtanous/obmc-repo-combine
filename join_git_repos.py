@@ -91,7 +91,7 @@ def parseexport(exp_str):
                 cmd = cmd + b"\n" + data
                 current_pos = data_end
 
-        commands.append(cmd)
+            commands.append(cmd)
 
     return commands
 

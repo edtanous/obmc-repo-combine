@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+from github import Github
+import os
+import pygit2
+import join_git_repos
+import re
+
+# Note, if you see error 403 rate limit errors, you probably need to authenticate
+g = Github(os.environ.get('GH_TOKEN', None))
+
+try:
+    os.mkdir("repos")
+except FileExistsError:
+    pass
+
+
+class MyRemoteCallbacks(pygit2.RemoteCallbacks):
+    def transfer_progress(self, stats):
+        print(f"{stats.indexed_objects}/{stats.total_objects}")
+
+
+denylist = ["linux", "u-boot", "openbmc", "qemu"]
+repolist = []
+
+tags = set()
+for repo in g.get_organization("openbmc").get_repos():
+    if repo.name in denylist:
+        continue
+    repodir = os.path.join("repos", repo.name)
+    if not os.path.exists(repodir):
+        pygit2.clone_repository(repo.clone_url, repodir,
+                                callbacks=MyRemoteCallbacks())
+    repo_object = pygit2.Repository(repodir)
+    print(repo.name)
+    repolist.append(repodir)
+
+    
+    '''
+    for tag in repo.get_tags():
+        if tag.name in tags:
+            raise Exception("Tag {} already exists".format(tag))
+        tags.add(tag.name)
+    '''
+    if repo.name != "openbmc":
+        # for all repos but the root, the tagged versions would now conflict so rename them to reponame-<old version>
+        tag_regex = re.compile('^refs/tags/')
+        for tag in repo_object.references:
+            if not tag_regex.match(tag):
+                continue
+            commit = repo_object.lookup_reference(tag)
+            if tag.startswith("refs/tags/" + repo.name):
+                # tag names already changed
+                continue
+            new_tag_name = tag[:10] + repo.name + "_" + tag[10:]
+            repo_object.references.create(new_tag_name, commit.name)
+            repo_object.references.delete(tag)
+
+            
+        
+
+no_subdirs = False
+join_git_repos.main("repos/openbmc", no_subdirs, repolist, "output")
