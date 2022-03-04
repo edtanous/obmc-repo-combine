@@ -6,7 +6,7 @@ import join_git_repos
 import re
 
 # Note, if you see error 403 rate limit errors, you probably need to authenticate
-g = Github(os.environ.get('GH_TOKEN', None))
+g = Github(os.environ.get("GH_TOKEN", None))
 
 try:
     os.mkdir("repos")
@@ -28,22 +28,20 @@ for repo in g.get_organization("openbmc").get_repos():
         continue
     repodir = os.path.join("repos", repo.name)
     if not os.path.exists(repodir):
-        pygit2.clone_repository(repo.clone_url, repodir,
-                                callbacks=MyRemoteCallbacks())
+        pygit2.clone_repository(repo.clone_url, repodir, callbacks=MyRemoteCallbacks())
     repo_object = pygit2.Repository(repodir)
     print(repo.name)
     repolist.append(repodir)
 
-    
-    '''
+    """
     for tag in repo.get_tags():
         if tag.name in tags:
             raise Exception("Tag {} already exists".format(tag))
         tags.add(tag.name)
-    '''
+    """
     if repo.name != "openbmc":
         # for all repos but the root, the tagged versions would now conflict so rename them to reponame-<old version>
-        tag_regex = re.compile('^refs/tags/')
+        tag_regex = re.compile("^refs/tags/")
         for tag in repo_object.references:
             if not tag_regex.match(tag):
                 continue
@@ -55,8 +53,6 @@ for repo in g.get_organization("openbmc").get_repos():
             repo_object.references.create(new_tag_name, commit.name)
             repo_object.references.delete(tag)
 
-            
-        
 
 no_subdirs = False
 join_git_repos.main("repos/openbmc", no_subdirs, repolist, "output")
