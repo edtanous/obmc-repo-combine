@@ -1,28 +1,18 @@
 #!/usr/bin/env python3
 # -*- mode: Python; tab-width: 4; indent-tabs-mode: nil; -*-
 """
-  Copyright (C) 2016 Marcus Geelnard
-
-  This software is provided 'as-is', without any express or implied
-  warranty.  In no event will the authors be held liable for any damages
-  arising from the use of this software.
-
-  Permission is granted to anyone to use this software for any purpose,
-  including commercial applications, and to alter it and redistribute it
-  freely, subject to the following restrictions:
-
-  1. The origin of this software must not be misrepresented; you must not
-     claim that you wrote the original software. If you use this software
-     in a product, an acknowledgment in the product documentation would be
-     appreciated but is not required.
-  2. Altered source versions must be plainly marked as such, and must not be
-     misrepresented as being the original software.
-  3. This notice may not be removed or altered from any source distribution.
+This file is originally sourced from https://github.com/mbitsnbites/git-tools/blob/master/join-git-repos.py
+and has been heavily modified to support this use.  Per the license requirements, the original license is retained in join_git_repos.license.original
 """
 
-import argparse, os, shutil, subprocess
+import argparse
+import os
+import shutil
+import subprocess
 
 # Clean out a directory.
+
+
 def cleandir(path):
     for the_file in os.listdir(path):
         file_path = os.path.join(path, the_file)
@@ -40,7 +30,7 @@ def getrepospec(spec):
     # Extract the branch.
     sep = spec.find(":")
     if sep >= 0:
-        branch = spec[(sep + 1) :]
+        branch = spec[(sep + 1):]
         spec = spec[:sep]
     else:
         branch = "master"
@@ -48,7 +38,7 @@ def getrepospec(spec):
     # Extract the name.
     sep = spec.find(",")
     if sep >= 0:
-        name = spec[(sep + 1) :]
+        name = spec[(sep + 1):]
         spec = spec[:sep]
     else:
         name = os.path.basename(os.path.abspath(spec))
@@ -64,7 +54,7 @@ def extractline(exp_str, pos):
     if eol_pos >= 0:
         return (exp_str[pos:eol_pos], eol_pos + 1)
     else:
-        return (exp_str[pos : len(exp_str)], len(exp_str))
+        return (exp_str[pos: len(exp_str)], len(exp_str))
 
 
 # Parse an export string into a list of commands.
@@ -85,7 +75,7 @@ def parseexport(exp_str):
 
             # Handle 'data'.
             if cmd_type == b"data":
-                data_len = int(cmd[(space_pos + 1) :])
+                data_len = int(cmd[(space_pos + 1):])
                 data_end = current_pos + data_len
                 data = exp_str[current_pos:data_end]
                 cmd = cmd + b"\n" + data
@@ -130,6 +120,10 @@ def importtorepo(repo_root, commands, branch):
     # Import the fast-import string into the repo.
     cmd = ["git", "-C", repo_root, "fast-import"]
     print("running command {}".format(" ".join(cmd)))
+
+    with open("fast-import", 'wb') as filehandle:
+        filehandle.write(import_str)
+
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     p.communicate(input=import_str)
     assert p.returncode == 0
@@ -142,25 +136,28 @@ def importtorepo(repo_root, commands, branch):
 
 # Prefix a path with a sub directory, taking ":s into account.
 def prefixpath(prefix, path):
+    if prefix == b'/':
+        return path
     if path[0] == b'"':
         assert path[len(path) - 1] == b'"'
+        path = path[1:]
         return b'"' + prefix + path[1:]
-    else:
-        return prefix + path
+
+    return prefix + path
 
 
 # Rewrite a .gitsubmodes file for putting modules in a new subdir.
 def prefixgitsubmodules(prefix, data):
     nl_pos = data.find(b"\n")
     assert nl_pos >= 0
-    blob = data[(nl_pos + 1) :].replace("path = ", "path = " + prefix)
+    blob = data[(nl_pos + 1):].replace("path = ", "path = " + prefix)
     return b"data " + str(len(blob)) + b"\n" + blob
 
 
 # Move all files to a subdirectory.
 def movetosubdir(commands, subdir):
     subdir = subdir.encode()
-    if subdir[-1:] != b"/":
+    if subdir[-1:] != b'/':
         subdir += b"/"
 
     found_gitmodules = False
@@ -190,6 +187,13 @@ def movetosubdir(commands, subdir):
             path = prefixpath(subdir, path)
             cmd = b" ".join(parts[:3]) + b" " + path
             commands[k] = cmd
+        elif cmd_type == b'D ':
+            path = cmd[2:]
+            # if path == b'.gitmodules':
+            #    found_gitmodules = True
+            # else:
+            path = prefixpath(subdir, path)
+            commands[k] = cmd[:2] + path
         elif (cmd_type == b"C ") or (cmd_type == b"R "):
             if cmd[2] == b'"':
                 src_end = cmd.find(b'"', 3)
@@ -198,20 +202,10 @@ def movetosubdir(commands, subdir):
             else:
                 src_end = cmd.find(b" ", 3) - 1
                 assert src_end >= 0
-            src_path = prefixpath(subdir, cmd[2 : (src_end + 1)])
-            dst_path = prefixpath(subdir, cmd[(src_end + 2) :])
+            src_path = prefixpath(subdir, cmd[2: (src_end + 1)])
+            dst_path = prefixpath(subdir, cmd[(src_end + 2):])
             commands[k] = cmd_type + src_path + b" " + dst_path
-        elif cmd_type == " ":
-            print("Whaaaaaa???")
-        """
-        elif cmd_type == b'D ':
-            path = cmd[2:]
-            if path == b'.gitmodules':
-                found_gitmodules = True
-            else:
-                path = prefixpath(subdir, path)
-            commands[k] = cmd[:2] + path
-        """
+
     return found_gitmodules
 
 
@@ -234,28 +228,28 @@ def renumbermarks(commands, mark_offset):
         colon_pos = cmd.find(b":")
         if colon_pos > 0:
             # Handle 'mark', 'from' and 'merge'.
-            if cmd[:colon_pos] in ["mark ", "from ", "merge "]:
+            if cmd[:colon_pos] in [b"mark ", b"from ", b"merge "]:
                 mark_pos = colon_pos + 1
                 mark = int(cmd[mark_pos:]) + mark_offset
-                commands[k] = cmd[:mark_pos] + str(mark)
+                commands[k] = cmd[:mark_pos] + str(mark).encode()
 
             # Handle 'M'.
             elif cmd[:2] == b"M ":
                 parts = cmd.split(b" ")
-                if parts[2][0] == b":":
+                if chr(parts[2][0]) == ':':
                     mark = int(parts[2][1:]) + mark_offset
-                    parts[2] = b":" + str(mark)
+                    parts[2] = b":" + str(mark).encode()
                     commands[k] = b" ".join(parts)
 
             # Handle 'N'.
             elif cmd[:2] == b"N ":
                 parts = cmd.split(b" ")
-                if parts[1][0] == b":":
+                if chr(parts[1][0]) == ':':
                     mark = int(parts[1][1:]) + mark_offset
                     parts[1] = b":" + str(mark)
-                if parts[2][0] == b":":
+                if chr(parts[2][0]) == ':':
                     mark = int(parts[2][1:]) + mark_offset
-                    parts[2] = b":" + str(mark)
+                    parts[2] = b":" + str(mark).encode()
                 commands[k] = b" ".join(parts)
 
 
@@ -263,15 +257,15 @@ def renumbermarks(commands, mark_offset):
 def extracttimestamp(cmd):
     # The time stamp comes directly after the e-mail address (enclosed in <>).
     gt_pos = cmd.index(b"> ")
-    time_stamp = cmd[(gt_pos + 2) :]
+    time_stamp = cmd[(gt_pos + 2):]
     # TODO(m): There must be a native Python way of doing this.
-    parts = time_stamp.split(" ")
+    parts = time_stamp.split(b" ")
     t = float(parts[0])
     if len(parts[1]) == 5:
         h = float(parts[1][1:3])
         m = float(parts[1][3:5])
         dt = 60 * (m + 60 * h)
-        if parts[1][0] == b"+":
+        if chr(parts[1][0]) == '+':
             t = t - dt
         else:
             t = t + dt
@@ -282,7 +276,11 @@ def extracttimestamp(cmd):
 def getlog(commands, branch, repo_id):
     log = []
 
-    ref_names = ["refs/heads/" + branch, "refs/heads/origin/" + branch]
+    ref_names = [
+        b"refs/heads/" + branch.encode(),
+        b"refs/heads/origin/" + branch.encode(),
+        b"refs/remotes/origin/" + branch.encode(),
+    ]
 
     # Walk backwards.
     parent_mark = ""
@@ -306,7 +304,8 @@ def getlog(commands, branch, repo_id):
             time_stamp = extracttimestamp(commands[cmd2_idx])
             cmd2_idx = cmd2_idx + 2
 
-            log.append({b"mark": commands[k + 1], b"time": time_stamp, b"id": repo_id})
+            log.append({b"mark": commands[k + 1],
+                       b"time": time_stamp, b"id": repo_id})
 
             # 'from' (optional) comes after 'committer' and 'data'.
             if commands[cmd2_idx][:5] == b"from ":
@@ -331,7 +330,7 @@ def combinelogs(log1, log2):
     idx1 = 0
     idx2 = 0
     while idx1 < len(log1) and idx2 < len(log2):
-        if log1[idx1]["time"] < log2[idx2]["time"]:
+        if log1[idx1][b"time"] < log2[idx2][b"time"]:
             log.append(log1[idx1])
             idx1 = idx1 + 1
         else:
@@ -409,8 +408,8 @@ def mergerpos(main_commands, secondary_commands, main_spec, secondary_spec):
         # Pick the next branch and merge point from the log.
         log_done = log_idx >= len(combined_log)
         if not log_done:
-            current_branch_id = combined_log[log_idx]["id"]
-            next_mark = combined_log[log_idx]["mark"]
+            current_branch_id = combined_log[log_idx][b"id"]
+            next_mark = combined_log[log_idx][b"mark"]
             log_idx = log_idx + 1
         else:
             current_branch_id = (
@@ -432,19 +431,19 @@ def mergerpos(main_commands, secondary_commands, main_spec, secondary_spec):
         src_commands = source["commands"]
         processed_all_commands = True
         first_commit_of_branch = source["idx"] == 0
-        mark_before_break = ""
+        mark_before_break = b""
         for k in range(source["idx"], len(src_commands)):
             if (not log_done) and (src_commands[k] == next_mark):
                 # Sanity check: The previous command must be a 'commit'.
-                if src_commands[k - 1][:7] != "commit ":
+                if src_commands[k - 1][:7] != b"commit ":
                     raise ValueError("Missing a commit command.")
 
                 # Special handling of the first commit of the branch: Make sure
                 # that it is attached to the other branch (if any), or the other
                 # branch will be orphaned.
-                new_parent_cmd = ""
+                new_parent_cmd = b""
                 if first_commit_of_branch and mark_from_prev_branch:
-                    new_parent_cmd = "from " + mark_from_prev_branch
+                    new_parent_cmd = b"from " + mark_from_prev_branch
                 first_commit_of_branch = False
 
                 # Finish this commit.
@@ -497,10 +496,7 @@ def mergerpos(main_commands, secondary_commands, main_spec, secondary_spec):
     return commands
 
 
-def main(main, no_subdirs, secondary_repos, out_root):
-    # Should we append subdirs?
-    move_to_subdirs = not no_subdirs
-
+def main(main, secondary_repos, out_root):
     # TODO(m): Support more than one repo with submodules (requires merging .gitmodules from several
     # repos, over time, ...).
     already_have_submodules = False
@@ -509,11 +505,10 @@ def main(main, no_subdirs, secondary_repos, out_root):
     main_spec = getrepospec(main)
     print("Exporting the main repository (" + main_spec["name"] + ")...")
     main_commands = exportrepo(main_spec["path"])
-    if move_to_subdirs:
-        found_submodules = movetosubdir(main_commands, main_spec["name"])
-        if found_submodules:
-            assert not already_have_submodules
-            already_have_submodules = True
+    found_submodules = movetosubdir(main_commands, main_spec["name"])
+    if found_submodules:
+        assert not already_have_submodules
+        already_have_submodules = True
     renamerefs(main_commands)
 
     # For each secondary repository...
@@ -521,11 +516,11 @@ def main(main, no_subdirs, secondary_repos, out_root):
         secondary_spec = getrepospec(secondary)
         print("\nExporting " + secondary_spec["name"] + "...")
         secondary_commands = exportrepo(secondary_spec["path"])
-        if move_to_subdirs:
-            found_submodules = movetosubdir(secondary_commands, secondary_spec["name"])
-            if found_submodules:
-                assert not already_have_submodules
-                already_have_submodules = True
+        found_submodules = movetosubdir(
+            secondary_commands, secondary_spec["name"])
+        if found_submodules:
+            assert not already_have_submodules
+            already_have_submodules = True
 
         print("\nMerging repositories...")
         main_commands = mergerpos(
@@ -566,7 +561,8 @@ if __name__ == "__main__":
         required="True",
         help="output directory for the stiched Git repo",
     )
-    parser.add_argument("main", metavar="MAIN", help="main repository specification")
+    parser.add_argument("main", metavar="MAIN",
+                        help="main repository specification")
     parser.add_argument(
         "secondary",
         metavar="SECONDARY",

@@ -4,6 +4,7 @@ import os
 import pygit2
 import join_git_repos
 import re
+import shutil
 
 # Note, if you see error 403 rate limit errors, you probably need to authenticate
 g = Github(os.environ.get("GH_TOKEN", None))
@@ -19,28 +20,46 @@ class MyRemoteCallbacks(pygit2.RemoteCallbacks):
         print(f"{stats.indexed_objects}/{stats.total_objects}")
 
 
-denylist = ["linux", "u-boot", "openbmc", "qemu"]
+# enabling this does the naive version, simply copying all the sources into the root so it can be compared
+build_simple_tree_test = False
+
+ignorelist = [
+    "linux",
+    "u-boot",
+    "qemu",
+    "openbmc.github.io",
+    "tof-election",
+    "openbmc"]
 repolist = []
+
+# clean up any old trees
+if build_simple_tree_test:
+    if os.path.exists("output_simple"):
+        shutil.rmtree("output_simple", onerror=None)
+    shutil.copytree("repos/openbmc", "output_simple", symlinks=False)
 
 tags = set()
 for repo in g.get_organization("openbmc").get_repos():
-    if repo.name in denylist:
+    if repo.name in ignorelist:
+        continue
+    if repo.archived:
+        continue
+    if repo.name.startswith("meta-"):
         continue
     repodir = os.path.join("repos", repo.name)
     if not os.path.exists(repodir):
-        pygit2.clone_repository(repo.clone_url, repodir, callbacks=MyRemoteCallbacks())
+        pygit2.clone_repository(repo.clone_url, repodir,
+                                callbacks=MyRemoteCallbacks())
     repo_object = pygit2.Repository(repodir)
     print(repo.name)
-    repolist.append(repodir)
+    repolist.append(repodir + "," + repo.name)
 
-    """
-    for tag in repo.get_tags():
-        if tag.name in tags:
-            raise Exception("Tag {} already exists".format(tag))
-        tags.add(tag.name)
-    """
+    # for all repos but the root, the tagged versions would now conflict so rename them to reponame-<old version>
     if repo.name != "openbmc":
-        # for all repos but the root, the tagged versions would now conflict so rename them to reponame-<old version>
+        if build_simple_tree_test:
+            shutil.copytree(repodir, os.path.join("output_simple", repo.name), symlinks=False)
+            shutil.rmtree(os.path.join("output_simple", repo.name, ".git"))
+
         tag_regex = re.compile("^refs/tags/")
         for tag in repo_object.references:
             if not tag_regex.match(tag):
@@ -53,6 +72,5 @@ for repo in g.get_organization("openbmc").get_repos():
             repo_object.references.create(new_tag_name, commit.name)
             repo_object.references.delete(tag)
 
-
 no_subdirs = False
-join_git_repos.main("repos/openbmc", no_subdirs, repolist, "output")
+join_git_repos.main("repos/openbmc,/", repolist, "output")
