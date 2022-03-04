@@ -30,7 +30,7 @@ def getrepospec(spec):
     # Extract the branch.
     sep = spec.find(":")
     if sep >= 0:
-        branch = spec[(sep + 1):]
+        branch = spec[(sep + 1) :]
         spec = spec[:sep]
     else:
         branch = "master"
@@ -38,7 +38,7 @@ def getrepospec(spec):
     # Extract the name.
     sep = spec.find(",")
     if sep >= 0:
-        name = spec[(sep + 1):]
+        name = spec[(sep + 1) :]
         spec = spec[:sep]
     else:
         name = os.path.basename(os.path.abspath(spec))
@@ -54,7 +54,7 @@ def extractline(exp_str, pos):
     if eol_pos >= 0:
         return (exp_str[pos:eol_pos], eol_pos + 1)
     else:
-        return (exp_str[pos: len(exp_str)], len(exp_str))
+        return (exp_str[pos : len(exp_str)], len(exp_str))
 
 
 # Parse an export string into a list of commands.
@@ -75,7 +75,7 @@ def parseexport(exp_str):
 
             # Handle 'data'.
             if cmd_type == b"data":
-                data_len = int(cmd[(space_pos + 1):])
+                data_len = int(cmd[(space_pos + 1) :])
                 data_end = current_pos + data_len
                 data = exp_str[current_pos:data_end]
                 cmd = cmd + b"\n" + data
@@ -121,7 +121,7 @@ def importtorepo(repo_root, commands, branch):
     cmd = ["git", "-C", repo_root, "fast-import"]
     print("running command {}".format(" ".join(cmd)))
 
-    with open("fast-import", 'wb') as filehandle:
+    with open("fast-import", "wb") as filehandle:
         filehandle.write(import_str)
 
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
@@ -136,7 +136,7 @@ def importtorepo(repo_root, commands, branch):
 
 # Prefix a path with a sub directory, taking ":s into account.
 def prefixpath(prefix, path):
-    if prefix == b'/':
+    if prefix == b"/":
         return path
     if path[0] == b'"':
         assert path[len(path) - 1] == b'"'
@@ -150,14 +150,14 @@ def prefixpath(prefix, path):
 def prefixgitsubmodules(prefix, data):
     nl_pos = data.find(b"\n")
     assert nl_pos >= 0
-    blob = data[(nl_pos + 1):].replace("path = ", "path = " + prefix)
+    blob = data[(nl_pos + 1) :].replace("path = ", "path = " + prefix)
     return b"data " + str(len(blob)) + b"\n" + blob
 
 
 # Move all files to a subdirectory.
 def movetosubdir(commands, subdir):
     subdir = subdir.encode()
-    if subdir[-1:] != b'/':
+    if subdir[-1:] != b"/":
         subdir += b"/"
 
     found_gitmodules = False
@@ -187,7 +187,7 @@ def movetosubdir(commands, subdir):
             path = prefixpath(subdir, path)
             cmd = b" ".join(parts[:3]) + b" " + path
             commands[k] = cmd
-        elif cmd_type == b'D ':
+        elif cmd_type == b"D ":
             path = cmd[2:]
             # if path == b'.gitmodules':
             #    found_gitmodules = True
@@ -202,8 +202,8 @@ def movetosubdir(commands, subdir):
             else:
                 src_end = cmd.find(b" ", 3) - 1
                 assert src_end >= 0
-            src_path = prefixpath(subdir, cmd[2: (src_end + 1)])
-            dst_path = prefixpath(subdir, cmd[(src_end + 2):])
+            src_path = prefixpath(subdir, cmd[2 : (src_end + 1)])
+            dst_path = prefixpath(subdir, cmd[(src_end + 2) :])
             commands[k] = cmd_type + src_path + b" " + dst_path
 
     return found_gitmodules
@@ -236,7 +236,7 @@ def renumbermarks(commands, mark_offset):
             # Handle 'M'.
             elif cmd[:2] == b"M ":
                 parts = cmd.split(b" ")
-                if chr(parts[2][0]) == ':':
+                if chr(parts[2][0]) == ":":
                     mark = int(parts[2][1:]) + mark_offset
                     parts[2] = b":" + str(mark).encode()
                     commands[k] = b" ".join(parts)
@@ -244,10 +244,10 @@ def renumbermarks(commands, mark_offset):
             # Handle 'N'.
             elif cmd[:2] == b"N ":
                 parts = cmd.split(b" ")
-                if chr(parts[1][0]) == ':':
+                if chr(parts[1][0]) == ":":
                     mark = int(parts[1][1:]) + mark_offset
                     parts[1] = b":" + str(mark)
-                if chr(parts[2][0]) == ':':
+                if chr(parts[2][0]) == ":":
                     mark = int(parts[2][1:]) + mark_offset
                     parts[2] = b":" + str(mark).encode()
                 commands[k] = b" ".join(parts)
@@ -257,7 +257,7 @@ def renumbermarks(commands, mark_offset):
 def extracttimestamp(cmd):
     # The time stamp comes directly after the e-mail address (enclosed in <>).
     gt_pos = cmd.index(b"> ")
-    time_stamp = cmd[(gt_pos + 2):]
+    time_stamp = cmd[(gt_pos + 2) :]
     # TODO(m): There must be a native Python way of doing this.
     parts = time_stamp.split(b" ")
     t = float(parts[0])
@@ -265,7 +265,7 @@ def extracttimestamp(cmd):
         h = float(parts[1][1:3])
         m = float(parts[1][3:5])
         dt = 60 * (m + 60 * h)
-        if chr(parts[1][0]) == '+':
+        if chr(parts[1][0]) == "+":
             t = t - dt
         else:
             t = t + dt
@@ -304,8 +304,9 @@ def getlog(commands, branch, repo_id):
             time_stamp = extracttimestamp(commands[cmd2_idx])
             cmd2_idx = cmd2_idx + 2
 
-            log.append({b"mark": commands[k + 1],
-                       b"time": time_stamp, b"id": repo_id})
+            log.append(
+                {b"mark": commands[k + 1], b"time": time_stamp, b"id": repo_id}
+            )
 
             # 'from' (optional) comes after 'committer' and 'data'.
             if commands[cmd2_idx][:5] == b"from ":
@@ -517,7 +518,8 @@ def main(main, secondary_repos, out_root):
         print("\nExporting " + secondary_spec["name"] + "...")
         secondary_commands = exportrepo(secondary_spec["path"])
         found_submodules = movetosubdir(
-            secondary_commands, secondary_spec["name"])
+            secondary_commands, secondary_spec["name"]
+        )
         if found_submodules:
             assert not already_have_submodules
             already_have_submodules = True
@@ -552,7 +554,10 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
-        "-n", "--no-subdirs", action="store_true", help="do not create subdirectories"
+        "-n",
+        "--no-subdirs",
+        action="store_true",
+        help="do not create subdirectories",
     )
     parser.add_argument(
         "-o",
@@ -561,8 +566,9 @@ if __name__ == "__main__":
         required="True",
         help="output directory for the stiched Git repo",
     )
-    parser.add_argument("main", metavar="MAIN",
-                        help="main repository specification")
+    parser.add_argument(
+        "main", metavar="MAIN", help="main repository specification"
+    )
     parser.add_argument(
         "secondary",
         metavar="SECONDARY",

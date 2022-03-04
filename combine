@@ -29,7 +29,8 @@ ignorelist = [
     "qemu",
     "openbmc.github.io",
     "tof-election",
-    "openbmc"]
+    "openbmc",
+]
 repolist = []
 
 # clean up any old trees
@@ -48,8 +49,9 @@ for repo in g.get_organization("openbmc").get_repos():
         continue
     repodir = os.path.join("repos", repo.name)
     if not os.path.exists(repodir):
-        pygit2.clone_repository(repo.clone_url, repodir,
-                                callbacks=MyRemoteCallbacks())
+        pygit2.clone_repository(
+            repo.clone_url, repodir, callbacks=MyRemoteCallbacks()
+        )
     repo_object = pygit2.Repository(repodir)
     print(repo.name)
     repolist.append(repodir + "," + repo.name)
@@ -57,7 +59,11 @@ for repo in g.get_organization("openbmc").get_repos():
     # for all repos but the root, the tagged versions would now conflict so rename them to reponame-<old version>
     if repo.name != "openbmc":
         if build_simple_tree_test:
-            shutil.copytree(repodir, os.path.join("output_simple", repo.name), symlinks=False)
+            shutil.copytree(
+                repodir,
+                os.path.join("output_simple", repo.name),
+                symlinks=False,
+            )
             shutil.rmtree(os.path.join("output_simple", repo.name, ".git"))
 
         tag_regex = re.compile("^refs/tags/")
