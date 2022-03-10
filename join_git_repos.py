@@ -178,6 +178,10 @@ def movetosubdir(commands, subdir):
         if cmd_type == b"M ":
             parts = cmd.split(b" ")
             path = b" ".join(parts[3:])
+            quoted = path.startswith(b'"')
+            if quoted:
+                assert path.endswith(b'"')
+                path = path[1:-1]
             # if path == b'.gitmodules':
             #    mark = parts[2]
             #    data_idx = mark_to_data_idx_map[mark]
@@ -185,6 +189,8 @@ def movetosubdir(commands, subdir):
             #    found_gitmodules = True
             # else:
             path = prefixpath(subdir, path)
+            if quoted:
+                path = b'"' + path + b'"'
             cmd = b" ".join(parts[:3]) + b" " + path
             commands[k] = cmd
         elif cmd_type == b"D ":

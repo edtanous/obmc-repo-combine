@@ -1,0 +1,40 @@
+From ca35036d2b5ceaa3509dca1b16aa756388a6fabe Mon Sep 17 00:00:00 2001
+From: Ed Tanous <edtanous@google.com>
+Date: Wed, 9 Mar 2022 16:24:57 -0800
+Subject: [PATCH] Fix paths for a couple things
+
+Signed-off-by: Ed Tanous <edtanous@google.com>
+---
+ meta-phosphor/recipes-extended/sdbusplus/python3-sdbus++_git.bb | 2 ++
+ meta-phosphor/recipes-phosphor/network/phosphor-snmp_git.bb     | 2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/meta-phosphor/recipes-extended/sdbusplus/python3-sdbus++_git.bb b/meta-phosphor/recipes-extended/sdbusplus/python3-sdbus++_git.bb
+index 6cfa030181..73979fb947 100644
+--- a/meta-phosphor/recipes-extended/sdbusplus/python3-sdbus++_git.bb
++++ b/meta-phosphor/recipes-extended/sdbusplus/python3-sdbus++_git.bb
+@@ -15,6 +15,8 @@ LIC_FILES_CHKSUM = "file://${COREBASE}/meta/files/common-licenses/Apache-2.0;md5
+ 
+ S="${WORKDIR}/git/tools"
+ 
++SETUPTOOLS_SETUP_PATH = "${S}"
++
+ DEPENDS += " \
+     ${PYTHON_PN}-inflection-native \
+     ${PYTHON_PN}-mako-native \
+diff --git a/meta-phosphor/recipes-phosphor/network/phosphor-snmp_git.bb b/meta-phosphor/recipes-phosphor/network/phosphor-snmp_git.bb
+index 2c4e4afd52..2d2fe97c1e 100644
+--- a/meta-phosphor/recipes-phosphor/network/phosphor-snmp_git.bb
++++ b/meta-phosphor/recipes-phosphor/network/phosphor-snmp_git.bb
+@@ -9,7 +9,7 @@ inherit python3native
+ inherit obmc-phosphor-dbus-service
+ 
+ LICENSE = "Apache-2.0"
+-LIC_FILES_CHKSUM = "file://${WORKDIR}/git/LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
++LIC_FILES_CHKSUM = "file://${S}/LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
+ 
+ SRC_URI += "git://github.com/openbmc/phosphor-snmp;branch=master;protocol=https"
+ SRCREV = "34d129a95281dd93ebf88f901895bc89c32b0bcd"
+-- 
+2.35.1.616.g0bdcbb4464-goog
+

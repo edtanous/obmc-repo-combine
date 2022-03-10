@@ -19,25 +19,14 @@ class MyRemoteCallbacks(pygit2.RemoteCallbacks):
     def transfer_progress(self, stats):
         print(f"{stats.indexed_objects}/{stats.total_objects}")
 
-
-# enabling this does the naive version, simply copying all the sources into the root so it can be compared
-build_simple_tree_test = False
-
 ignorelist = [
     "linux",
     "u-boot",
     "qemu",
     "openbmc.github.io",
     "tof-election",
-    "openbmc",
 ]
 repolist = []
-
-# clean up any old trees
-if build_simple_tree_test:
-    if os.path.exists("output_simple"):
-        shutil.rmtree("output_simple", onerror=None)
-    shutil.copytree("repos/openbmc", "output_simple", symlinks=False)
 
 tags = set()
 for repo in g.get_organization("openbmc").get_repos():
@@ -54,18 +43,11 @@ for repo in g.get_organization("openbmc").get_repos():
         )
     repo_object = pygit2.Repository(repodir)
     print(repo.name)
-    repolist.append(repodir + "," + repo.name)
+    if repo.name != "openbmc":
+        repolist.append(repodir + "," + repo.name)
 
     # for all repos but the root, the tagged versions would now conflict so rename them to reponame-<old version>
     if repo.name != "openbmc":
-        if build_simple_tree_test:
-            shutil.copytree(
-                repodir,
-                os.path.join("output_simple", repo.name),
-                symlinks=False,
-            )
-            shutil.rmtree(os.path.join("output_simple", repo.name, ".git"))
-
         tag_regex = re.compile("^refs/tags/")
         for tag in repo_object.references:
             if not tag_regex.match(tag):
@@ -78,5 +60,33 @@ for repo in g.get_organization("openbmc").get_repos():
             repo_object.references.create(new_tag_name, commit.name)
             repo_object.references.delete(tag)
 
-no_subdirs = False
 join_git_repos.main("repos/openbmc,/", repolist, "output")
+
+for root, dirs, files in os.walk("output"):
+    # no need to walk non-meta directories
+    if root == "output":
+        dirs[:] = [d for d in dirs if d.startswith("meta-")]
+    for filename in files:
+        if (not filename.endswith(".bb") and not filename.endswith(".inc")):
+            continue
+        filepath = os.path.join(root, filename)
+        with open(filepath, 'r') as bb:
+            bb_contents = bb.readlines()
+        
+        linesout = []
+        pn = filename.split("_")[0]
+        src_rev_line_number = None
+        recipe_name = None
+        for line_number, line in enumerate(bb_contents):
+            match = re.match("^SRC_URI \+?= \"git://github.com/openbmc/([\w\-_]+)(.git)?;.*", line)
+            if match:
+                print("Found BB file to modify {}".format(filename))
+                src_rev_line_number = line_number
+                recipe_name = match.group(1)
+
+        if src_rev_line_number:
+            bb_contents.append("\ninherit externalsrc\n")
+            bb_contents.append("EXTERNALSRC:pn-{} = \"${{TOPDIR}}/../{}\"\n".format(pn, recipe_name))
+        
+        with open(filepath, 'w') as bb:
+            bb.write("".join(bb_contents))
