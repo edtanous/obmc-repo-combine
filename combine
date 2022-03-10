@@ -19,6 +19,7 @@ class MyRemoteCallbacks(pygit2.RemoteCallbacks):
     def transfer_progress(self, stats):
         print(f"{stats.indexed_objects}/{stats.total_objects}")
 
+
 ignorelist = [
     "linux",
     "u-boot",
@@ -67,18 +68,21 @@ for root, dirs, files in os.walk("output"):
     if root == "output":
         dirs[:] = [d for d in dirs if d.startswith("meta-")]
     for filename in files:
-        if (not filename.endswith(".bb") and not filename.endswith(".inc")):
+        if not filename.endswith(".bb") and not filename.endswith(".inc"):
             continue
         filepath = os.path.join(root, filename)
-        with open(filepath, 'r') as bb:
+        with open(filepath, "r") as bb:
             bb_contents = bb.readlines()
-        
+
         linesout = []
         pn = filename.split("_")[0]
         src_rev_line_number = None
         recipe_name = None
         for line_number, line in enumerate(bb_contents):
-            match = re.match("^SRC_URI \+?= \"git://github.com/openbmc/([\w\-_]+)(.git)?;.*", line)
+            match = re.match(
+                '^SRC_URI \+?= "git://github.com/openbmc/([\w\-_]+)(.git)?;.*',
+                line,
+            )
             if match:
                 print("Found BB file to modify {}".format(filename))
                 src_rev_line_number = line_number
@@ -86,7 +90,11 @@ for root, dirs, files in os.walk("output"):
 
         if src_rev_line_number:
             bb_contents.append("\ninherit externalsrc\n")
-            bb_contents.append("EXTERNALSRC:pn-{} = \"${{TOPDIR}}/../{}\"\n".format(pn, recipe_name))
-        
-        with open(filepath, 'w') as bb:
+            bb_contents.append(
+                'EXTERNALSRC:pn-{} = "${{TOPDIR}}/../{}"\n'.format(
+                    pn, recipe_name
+                )
+            )
+
+        with open(filepath, "w") as bb:
             bb.write("".join(bb_contents))
